@@ -1,0 +1,90 @@
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  gap: 32rpx;
+  padding: 32rpx 24rpx 48rpx;
+  box-sizing: border-box;
+}
+
+.video-shell {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 24rpx;
+  overflow: hidden;
+  background: #1f2937;
+  box-shadow: 0 18rpx 44rpx rgba(15, 23, 42, 0.35);
+}
+
+.camera,
+.overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.overlay {
+  pointer-events: none;
+}
+
+.encoder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.hud {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 12rpx;
+  font-size: 26rpx;
+  color: #cbd5f5;
+}
+
+.status {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+
+.status-dot {
+  width: 18rpx;
+  height: 18rpx;
+  border-radius: 50%;
+  background: #ef4444;
+  box-shadow: 0 0 12rpx rgba(239, 68, 68, 0.45);
+}
+
+.status-dot.on {
+  background: #22c55e;
+  box-shadow: 0 0 12rpx rgba(34, 197, 94, 0.5);
+}
+
+.controls {
+  display: flex;
+  gap: 24rpx;
+}
+
+button.primary {
+  flex: 1 1 auto;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #f8fafc;
+}
+
+button.ghost {
+  flex: 0 0 auto;
+  background: rgba(30, 41, 59, 0.6);
+  color: #cbd5f5;
+}
+
+.stats {
+  display: flex;
+  gap: 24rpx;
+}

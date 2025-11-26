@@ -1,0 +1,68 @@
+# YOLOv11n Improved Configuration
+# 基于开题报告文献的改进方案
+# 改进点：DyHead动态检测头 + GAM注意力 + 优化损失函数
+
+# Model
+model_size: yolo11n
+nc: 2  # 类别数（no_mask, mask）
+names: [no_mask, mask]
+
+# Architecture improvements (待实现)
+# - DyHead: 动态检测头（文献[18]）
+# - GAM Attention: 全局注意力机制（文献[17]）
+# - PConv: 部分卷积轻量化（文献[2][16]）
+
+# Training hyperparameters (相比baseline优化)
+lr0: 0.01  # 初始学习率
+lrf: 0.01  # 最终学习率
+momentum: 0.937
+weight_decay: 0.0005
+warmup_epochs: 3.0
+warmup_momentum: 0.8
+warmup_bias_lr: 0.1
+
+# Loss function weights (针对小目标优化)
+box: 8.0  # 边界框损失权重（提高，强化小目标定位）
+cls: 0.6  # 分类损失权重（提高）
+dfl: 1.5  # DFL损失权重
+
+# Advanced loss (待集成)
+# - PIoU: 像素IoU损失（文献[17]）
+# - WIoU: 加权IoU损失（文献[10]）
+# - Inner-MPDIoU: 内部最小点距离IoU（文献[16]）
+
+# Data augmentation (针对复杂场景增强)
+hsv_h: 0.02  # 色调增强（增加，应对光照变化）
+hsv_s: 0.8  # 饱和度增强（增加）
+hsv_v: 0.5  # 亮度增强（增加，应对烟雾/遮挡）
+degrees: 15.0  # 旋转角度（增加，应对多姿态）
+translate: 0.15  # 平移（增加）
+scale: 0.6  # 缩放（增加，应对小目标）
+shear: 3.0  # 剪切（增加）
+perspective: 0.0001  # 透视变换（启用）
+flipud: 0.0
+fliplr: 0.5
+mosaic: 1.0
+mixup: 0.15  # Mixup增强（增加）
+copy_paste: 0.15  # Copy-paste增强（增加，应对密集人群）
+
+# Advanced settings
+amp: true  # 混合精度训练
+cache: false
+workers: 8
+overlap_mask: true
+mask_ratio: 4
+dropout: 0.1  # 添加Dropout防止过拟合
+val: true
+plots: true
+save_period: 10
+
+# Multi-scale training (针对小目标)
+multi_scale: true  # 多尺度训练
+close_mosaic: 10  # 最后N轮关闭Mosaic
+
+# Notes
+# - 此配置用于消融实验：Baseline + 改进模块
+# - 预期提升：mAP@0.5 提升2-5%
+# - 代价：轻微增加推理时间（仍需<3秒/张）
+# - 需确保ONNX模型<80MB

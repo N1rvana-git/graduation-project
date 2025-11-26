@@ -1,0 +1,12 @@
+page {
+  background: #0f172a;
+  color: #e2e8f0;
+  font-family: "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+button {
+  border-radius: 9999rpx;
+  border: none;
+  padding: 24rpx 48rpx;
+  font-size: 30rpx;
+}

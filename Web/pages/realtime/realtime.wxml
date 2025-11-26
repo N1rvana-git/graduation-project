@@ -1,0 +1,42 @@
+<view class="page">
+  <view class="video-shell">
+    <camera
+      id="camera"
+      device-position="{{devicePosition}}"
+      flash="{{flashMode}}"
+      mode="normal"
+      resolution="high"
+      frame-size="medium"
+      binderror="handleCameraError"
+      class="camera">
+    </camera>
+    <canvas
+      type="2d"
+      id="overlay"
+      canvas-id="overlayCanvas"
+      class="overlay">
+    </canvas>
+    <canvas
+      type="2d"
+      id="frameEncoder"
+      canvas-id="frameEncoder"
+      class="encoder">
+    </canvas>
+  </view>
+
+  <view class="hud">
+    <view class="status">
+      <text class="status-dot {{connected ? 'on' : 'off'}}"></text>
+      <text>{{connected ? '已连接后端' : '等待连接'}}</text>
+    </view>
+    <view class="stats">
+      <text>FPS: {{stats.fps}}</text>
+      <text>Detections: {{stats.detectionCount}}</text>
+    </view>
+  </view>
+
+  <view class="controls">
+    <button class="primary" bindtap="toggleStreaming">{{streaming ? '停止检测' : '开始检测'}}</button>
+    <button class="ghost" bindtap="switchCamera">切换摄像头</button>
+  </view>
+</view>

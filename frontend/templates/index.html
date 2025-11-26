@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>口罩佩戴检测系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .main-container {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(10px);
+            margin: 20px auto;
+            max-width: 1200px;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 20px 20px 0 0;
+            text-align: center;
+        }
+        
+        .video-container {
+            position: relative;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+        
+        #videoElement {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        
+        .canvas-container {
+            position: relative;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 2px dashed #dee2e6;
+            min-height: 300px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        #resultCanvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 10px;
+        }
+        
+        .upload-area {
+            border: 2px dashed #007bff;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            background: #f8f9fa;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .upload-area:hover {
+            border-color: #0056b3;
+            background: #e3f2fd;
+        }
+        
+        .upload-area.dragover {
+            border-color: #28a745;
+            background: #d4edda;
+        }
+        
+        .btn-custom {
+            border-radius: 25px;
+            padding: 12px 30px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-primary-custom {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            color: white;
+        }
+        
+        .btn-primary-custom:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-success-custom {
+            background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%);
+            border: none;
+            color: white;
+        }
+        
+        .btn-danger-custom {
+            background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
+            border: none;
+            color: white;
+        }
+        
+        .stats-card {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            margin: 15px 0;
+            transition: transform 0.3s ease;
+        }
+        
+        .stats-card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-icon {
+            font-size: 2.5rem;
+            margin-bottom: 15px;
+        }
+        
+        .stat-number {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 20px;
+        }
+        
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #007bff;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 15px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        .alert-custom {
+            border-radius: 10px;
+            border: none;
+            padding: 15px 20px;
+        }
+        
+        .control-panel {
+            background: white;
+            border-radius: 15px;
+            padding: 25px;
+            margin: 20px 0;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        }
+        
+        .threshold-control {
+            margin: 15px 0;
+        }
+        
+        .threshold-value {
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="main-container">
+            <!-- 头部 -->
+            <div class="header">
+                <h1><i class="fas fa-mask"></i> 口罩佩戴检测系统</h1>
+                <p class="mb-0">基于YOLOv7的实时口罩检测技术</p>
+            </div>
+            
+            <!-- 主要内容 -->
+            <div class="p-4">
+                <div class="row">
+                    <!-- 左侧控制面板 -->
+                    <div class="col-lg-4">
+                        <div class="control-panel">
+                            <h4><i class="fas fa-cog"></i> 控制面板</h4>
+                            
+                            <!-- 摄像头控制 -->
+                            <div class="mb-4">
+                                <h6>摄像头控制</h6>
+                                <button id="startCamera" class="btn btn-success-custom btn-custom me-2">
+                                    <i class="fas fa-video"></i> 开启摄像头
+                                </button>
+                                <button id="stopCamera" class="btn btn-danger-custom btn-custom" disabled>
+                                    <i class="fas fa-video-slash"></i> 关闭摄像头
+                                </button>
+                            </div>
+                            
+                            <!-- 检测控制 -->
+                            <div class="mb-4">
+                                <h6>检测控制</h6>
+                                <button id="captureBtn" class="btn btn-primary-custom btn-custom me-2" disabled>
+                                    <i class="fas fa-camera"></i> 拍照检测
+                                </button>
+                                <button id="realTimeBtn" class="btn btn-primary-custom btn-custom" disabled>
+                                    <i class="fas fa-play"></i> 实时检测
+                                </button>
+                            </div>
+                            
+                            <!-- 置信度阈值 -->
+                            <div class="threshold-control">
+                                <label for="confidenceThreshold" class="form-label">
+                                    置信度阈值: <span id="confidenceValue" class="threshold-value">0.5</span>
+                                </label>
+                                <input type="range" class="form-range" id="confidenceThreshold" 
+                                       min="0.1" max="0.9" step="0.1" value="0.5">
+                            </div>
+                            
+                            <!-- 文件上传 -->
+                            <div class="mb-4">
+                                <h6>文件上传</h6>
+                                <div class="upload-area" id="uploadArea">
+                                    <i class="fas fa-cloud-upload-alt fa-3x text-primary mb-3"></i>
+                                    <p>拖拽图片到此处或点击选择文件</p>
+                                    <input type="file" id="fileInput" accept="image/*" style="display: none;">
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- 统计信息 -->
+                        <div class="stats-card">
+                            <h5><i class="fas fa-chart-bar"></i> 检测统计</h5>
+                            <div class="row text-center">
+                                <div class="col-6">
+                                    <div class="stat-icon text-success">
+                                        <i class="fas fa-check-circle"></i>
+                                    </div>
+                                    <div class="stat-number text-success" id="maskCount">0</div>
+                                    <div class="text-muted">佩戴口罩</div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="stat-icon text-danger">
+                                        <i class="fas fa-times-circle"></i>
+                                    </div>
+                                    <div class="stat-number text-danger" id="noMaskCount">0</div>
+                                    <div class="text-muted">未佩戴口罩</div>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <div class="d-flex justify-content-between">
+                                    <span>佩戴率:</span>
+                                    <span id="maskRate" class="fw-bold">0%</span>
+                                </div>
+                                <div class="d-flex justify-content-between">
+                                    <span>检测时间:</span>
+                                    <span id="inferenceTime" class="fw-bold">0ms</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- 右侧显示区域 -->
+                    <div class="col-lg-8">
+                        <!-- 摄像头视频 -->
+                        <div class="video-container">
+                            <video id="videoElement" autoplay muted playsinline></video>
+                        </div>
+                        
+                        <!-- 检测结果 -->
+                        <div class="canvas-container">
+                            <canvas id="resultCanvas"></canvas>
+                            <div id="placeholderText" class="text-muted">
+                                <i class="fas fa-image fa-3x mb-3"></i>
+                                <p>检测结果将在此显示</p>
+                            </div>
+                        </div>
+                        
+                        <!-- 加载状态 -->
+                        <div id="loading" class="loading">
+                            <div class="spinner"></div>
+                            <p>正在检测中...</p>
+                        </div>
+                        
+                        <!-- 消息提示 -->
+                        <div id="messageArea"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        class MaskDetectionApp {
+            constructor() {
+                this.video = document.getElementById('videoElement');
+                this.canvas = document.getElementById('resultCanvas');
+                this.ctx = this.canvas.getContext('2d');
+                this.stream = null;
+                this.isRealTimeDetection = false;
+                this.detectionInterval = null;
+                
+                this.initializeElements();
+                this.bindEvents();
+                this.checkServerHealth();
+            }
+            
+            initializeElements() {
+                this.startCameraBtn = document.getElementById('startCamera');
+                this.stopCameraBtn = document.getElementById('stopCamera');
+                this.captureBtn = document.getElementById('captureBtn');
+                this.realTimeBtn = document.getElementById('realTimeBtn');
+                this.confidenceSlider = document.getElementById('confidenceThreshold');
+                this.confidenceValue = document.getElementById('confidenceValue');
+                this.fileInput = document.getElementById('fileInput');
+                this.uploadArea = document.getElementById('uploadArea');
+                this.loading = document.getElementById('loading');
+                this.messageArea = document.getElementById('messageArea');
+                this.placeholderText = document.getElementById('placeholderText');
+                
+                // 统计元素
+                this.maskCount = document.getElementById('maskCount');
+                this.noMaskCount = document.getElementById('noMaskCount');
+                this.maskRate = document.getElementById('maskRate');
+                this.inferenceTime = document.getElementById('inferenceTime');
+            }
+            
+            bindEvents() {
+                // 摄像头控制
+                this.startCameraBtn.addEventListener('click', () => this.startCamera());
+                this.stopCameraBtn.addEventListener('click', () => this.stopCamera());
+                
+                // 检测控制
+                this.captureBtn.addEventListener('click', () => this.captureAndDetect());
+                this.realTimeBtn.addEventListener('click', () => this.toggleRealTimeDetection());
+                
+                // 置信度滑块
+                this.confidenceSlider.addEventListener('input', (e) => {
+                    this.confidenceValue.textContent = e.target.value;
+                });
+                
+                // 文件上传
+                this.uploadArea.addEventListener('click', () => this.fileInput.click());
+                this.fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+                
+                // 拖拽上传
+                this.uploadArea.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.add('dragover');
+                });
+                
+                this.uploadArea.addEventListener('dragleave', () => {
+                    this.uploadArea.classList.remove('dragover');
+                });
+                
+                this.uploadArea.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    this.uploadArea.classList.remove('dragover');
+                    const files = e.dataTransfer.files;
+                    if (files.length > 0) {
+                        this.processImageFile(files[0]);
+                    }
+                });
+            }
+            
+            async checkServerHealth() {
+                try {
+                    const response = await fetch('/api/health');
+                    const data = await response.json();
+                    
+                    if (data.status === 'healthy') {
+                        this.showMessage('服务器连接正常', 'success');
+                    } else {
+                        this.showMessage('服务器状态异常', 'warning');
+                    }
+                } catch (error) {
+                    this.showMessage('无法连接到服务器', 'danger');
+                }
+            }
+            
+            async startCamera() {
+                try {
+                    this.stream = await navigator.mediaDevices.getUserMedia({
+                        video: { width: 640, height: 480 }
+                    });
+                    
+                    this.video.srcObject = this.stream;
+                    
+                    this.startCameraBtn.disabled = true;
+                    this.stopCameraBtn.disabled = false;
+                    this.captureBtn.disabled = false;
+                    this.realTimeBtn.disabled = false;
+                    
+                    this.showMessage('摄像头已开启', 'success');
+                } catch (error) {
+                    this.showMessage('无法访问摄像头: ' + error.message, 'danger');
+                }
+            }
+            
+            stopCamera() {
+                if (this.stream) {
+                    this.stream.getTracks().forEach(track => track.stop());
+                    this.stream = null;
+                }
+                
+                this.video.srcObject = null;
+                
+                this.startCameraBtn.disabled = false;
+                this.stopCameraBtn.disabled = true;
+                this.captureBtn.disabled = true;
+                this.realTimeBtn.disabled = true;
+                
+                this.stopRealTimeDetection();
+                this.showMessage('摄像头已关闭', 'info');
+            }
+            
+            captureAndDetect() {
+                if (!this.stream) return;
+                
+                // 创建临时canvas来捕获视频帧
+                const tempCanvas = document.createElement('canvas');
+                const tempCtx = tempCanvas.getContext('2d');
+                
+                tempCanvas.width = this.video.videoWidth;
+                tempCanvas.height = this.video.videoHeight;
+                
+                tempCtx.drawImage(this.video, 0, 0);
+                
+                // 转换为blob并发送检测
+                tempCanvas.toBlob(blob => {
+                    this.detectImage(blob);
+                }, 'image/jpeg', 0.8);
+            }
+            
+            toggleRealTimeDetection() {
+                if (this.isRealTimeDetection) {
+                    this.stopRealTimeDetection();
+                } else {
+                    this.startRealTimeDetection();
+                }
+            }
+            
+            startRealTimeDetection() {
+                this.isRealTimeDetection = true;
+                this.realTimeBtn.innerHTML = '<i class="fas fa-stop"></i> 停止实时检测';
+                this.realTimeBtn.classList.remove('btn-primary-custom');
+                this.realTimeBtn.classList.add('btn-danger-custom');
+                
+                this.detectionInterval = setInterval(() => {
+                    this.captureAndDetect();
+                }, 1000); // 每秒检测一次
+                
+                this.showMessage('实时检测已开启', 'info');
+            }
+            
+            stopRealTimeDetection() {
+                this.isRealTimeDetection = false;
+                this.realTimeBtn.innerHTML = '<i class="fas fa-play"></i> 实时检测';
+                this.realTimeBtn.classList.remove('btn-danger-custom');
+                this.realTimeBtn.classList.add('btn-primary-custom');
+                
+                if (this.detectionInterval) {
+                    clearInterval(this.detectionInterval);
+                    this.detectionInterval = null;
+                }
+                
+                this.showMessage('实时检测已停止', 'info');
+            }
+            
+            handleFileUpload(event) {
+                const file = event.target.files[0];
+                if (file) {
+                    this.processImageFile(file);
+                }
+            }
+            
+            processImageFile(file) {
+                if (!file.type.startsWith('image/')) {
+                    this.showMessage('请选择图片文件', 'warning');
+                    return;
+                }
+                
+                this.detectImage(file);
+            }
+            
+            async detectImage(imageData) {
+                this.showLoading(true);
+                
+                try {
+                    const formData = new FormData();
+                    formData.append('image', imageData);
+                    
+                    const response = await fetch('/api/detect', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        this.displayResults(result);
+                        this.updateStatistics(result.statistics);
+                        this.showMessage(`检测完成，用时 ${result.inference_time}s`, 'success');
+                    } else {
+                        this.showMessage('检测失败: ' + result.error, 'danger');
+                    }
+                } catch (error) {
+                    this.showMessage('检测请求失败: ' + error.message, 'danger');
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+            
+            displayResults(result) {
+                if (result.annotated_image) {
+                    const img = new Image();
+                    img.onload = () => {
+                        this.canvas.width = img.width;
+                        this.canvas.height = img.height;
+                        this.ctx.drawImage(img, 0, 0);
+                        this.placeholderText.style.display = 'none';
+                        this.canvas.style.display = 'block';
+                    };
+                    img.src = result.annotated_image;
+                }
+            }
+            
+            updateStatistics(stats) {
+                this.maskCount.textContent = stats.mask_count || 0;
+                this.noMaskCount.textContent = stats.no_mask_count || 0;
+                this.maskRate.textContent = (stats.mask_rate || 0) + '%';
+                this.inferenceTime.textContent = (stats.average_confidence * 1000).toFixed(0) + 'ms';
+            }
+            
+            showLoading(show) {
+                this.loading.style.display = show ? 'block' : 'none';
+            }
+            
+            showMessage(message, type = 'info') {
+                const alertClass = `alert-${type}`;
+                const iconClass = {
+                    'success': 'fas fa-check-circle',
+                    'danger': 'fas fa-exclamation-triangle',
+                    'warning': 'fas fa-exclamation-circle',
+                    'info': 'fas fa-info-circle'
+                }[type] || 'fas fa-info-circle';
+                
+                const alertHtml = `
+                    <div class="alert ${alertClass} alert-custom alert-dismissible fade show" role="alert">
+                        <i class="${iconClass} me-2"></i>
+                        ${message}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    </div>
+                `;
+                
+                this.messageArea.innerHTML = alertHtml;
+                
+                // 自动消失
+                setTimeout(() => {
+                    const alert = this.messageArea.querySelector('.alert');
+                    if (alert) {
+                        alert.remove();
+                    }
+                }, 5000);
+            }
+        }
+        
+        // 初始化应用
+        document.addEventListener('DOMContentLoaded', () => {
+            new MaskDetectionApp();
+        });
+    </script>
+</body>
+</html>

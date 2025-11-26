@@ -1,0 +1,17 @@
+{
+  "pages": [
+    "pages/realtime/realtime"
+  ],
+  "permission": {
+    "scope.camera": {
+      "desc": "用于实时检测口罩佩戴情况"
+    }
+  },
+  "window": {
+    "navigationBarTitleText": "口罩佩戴实时检测",
+    "navigationBarBackgroundColor": "#111827",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0f172a",
+    "backgroundTextStyle": "light"
+  }
+}

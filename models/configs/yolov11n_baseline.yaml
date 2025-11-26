@@ -1,0 +1,52 @@
+# YOLOv11n Baseline Configuration
+# 用于口罩检测任务的基线模型配置
+# 符合开题报告要求：轻量化、高精度、适配4GB显存
+
+# Model
+model_size: yolo11n
+nc: 2  # 类别数（no_mask, mask）
+names: [no_mask, mask]
+
+# Training hyperparameters
+lr0: 0.01  # 初始学习率
+lrf: 0.01  # 最终学习率（lr0 * lrf）
+momentum: 0.937  # SGD动量
+weight_decay: 0.0005  # 权重衰减
+warmup_epochs: 3.0  # 预热轮数
+warmup_momentum: 0.8  # 预热动量
+warmup_bias_lr: 0.1  # 预热偏置学习率
+box: 7.5  # 边界框损失权重
+cls: 0.5  # 分类损失权重
+dfl: 1.5  # DFL损失权重
+
+# Data augmentation
+hsv_h: 0.015  # 色调增强
+hsv_s: 0.7  # 饱和度增强
+hsv_v: 0.4  # 亮度增强
+degrees: 10.0  # 旋转角度（±deg）
+translate: 0.1  # 平移（±百分比）
+scale: 0.5  # 缩放（±增益）
+shear: 2.0  # 剪切（±度数）
+perspective: 0.0  # 透视变换（±百分比）
+flipud: 0.0  # 上下翻转概率
+fliplr: 0.5  # 左右翻转概率
+mosaic: 1.0  # Mosaic增强概率
+mixup: 0.1  # Mixup增强概率
+copy_paste: 0.1  # Copy-paste增强概率
+
+# Advanced settings
+amp: true  # 混合精度训练（AMP）- 重要：4GB显存优化
+cache: false  # 不缓存图像（节省显存）
+workers: 8  # 数据加载线程数
+overlap_mask: true  # 实例分割掩码重叠
+mask_ratio: 4  # 掩码下采样比例
+dropout: 0.0  # Dropout概率
+val: true  # 训练时验证
+plots: true  # 保存训练图表
+save_period: 10  # 每N轮保存一次检查点
+
+# Notes
+# - 此配置针对RTX 3050 Laptop GPU (4GB)优化
+# - 批次大小建议：32（自动优化）
+# - 训练轮数建议：100-200
+# - 目标mAP@0.5: ≥92%（开题报告要求）
