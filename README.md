@@ -1,180 +1,132 @@
-# 基于YOLOv7的口罩佩戴检测系统
+
+# 基于YOLOv11n的口罩佩戴检测系统
 
 ## 项目简介
 
-本项目是一个基于YOLOv7深度学习模型的口罩佩戴检测系统，能够实时检测图像或视频中人员是否正确佩戴口罩。系统采用端到端的智能平台架构，通过Python FastAPI后端与前端的优化通信机制，实现实时视频流分析结果的即时反馈。
+本项目为毕业设计，基于YOLOv11n/YOLOv7深度学习模型，支持高效、轻量的口罩佩戴检测。系统包含模型训练、ONNX导出、FastAPI/ONNXRuntime后端推理、前端实时检测等完整流程，适配4GB显存环境，支持微信小程序等Web端部署。
 
 ## 主要特性
 
-- **AI模型**: YOLOv7口罩检测模型，具备更高的精度和速度
-- **后端服务**: FastAPI RESTful API，支持图像和视频流检测
-- **前端界面**: 现代化网页端测试界面
-- **实时检测**: 支持实时视频流分析和批量图像处理
-- **部署环境**: 支持云服务器和Docker容器化部署
-- **性能优化**: GPU加速推理，内存优化管理
+- **AI模型**：YOLOv11n/YOLOv7，支持自定义结构与消融实验
+- **训练脚本**：支持自动batch size优化、混合精度、丰富数据增强
+- **后端服务**：FastAPI/ONNXRuntime，RESTful接口，支持Base64和文件上传
+- **前端**：现代化网页端，支持实时视频流检测
+- **部署**：支持Docker、云服务器、小程序端推理
+- **学术复现**：训练曲线自动保存，实验结果可复查
 
 ## 项目结构
 
 ```
-mask-detection-system/
-├── yolov7/                # YOLOv7模型源码
-│   ├── models/           # 模型定义
-│   ├── utils/            # 工具函数
-│   ├── weights/          # 预训练权重
-│   └── data/             # 数据配置
-├── models/               # 训练脚本和自定义模型
-│   ├── train_mask_detection.py  # 口罩检测训练脚本
-│   ├── weights/          # 训练好的模型权重
-│   └── configs/          # 训练配置文件
-├── backend/              # FastAPI后端服务
-│   ├── app.py           # 主应用文件
-│   ├── api/             # API接口
-│   │   └── detection.py # 检测API
-│   └── utils/           # 工具函数
-│       ├── model_loader.py    # 模型加载器
-│       └── image_utils.py     # 图像处理工具
-├── frontend/            # 前端界面
-│   ├── static/          # 静态资源
-│   └── templates/       # HTML模板
-├── data/                # 数据集
-│   ├── images/          # 图像数据
-│   ├── labels/          # 标注数据
-│   └── mask_detection.yaml    # 数据集配置
-├── tests/               # 测试文件
-├── deployment/          # 部署相关文件
-│   ├── docker/          # Docker配置
-│   └── scripts/         # 部署脚本
-├── requirements.txt     # Python依赖
-└── README.md           # 项目说明
+├── models/                  # 训练脚本与模型
+│   ├── train_yolov11_mask_detection.py  # YOLOv11n训练主脚本
+│   ├── train_yolov7_mask_detection.py   # YOLOv7训练主脚本
+│   └── weights/            # 训练权重与ONNX模型
+├── backend/                 # FastAPI后端
+│   ├── app.py               # 主服务（YOLOv11n）
+│   ├── app_onnx_fastapi.py  # ONNX推理服务
+│   └── api/                 # API接口
+├── data/                    # 数据集与配置
+│   └── mask_detection.yaml
+├── runs/                    # 训练输出
+│   └── yolov11_mask_detection/custom_v2_accum/
+│       ├── training_curves.png
+│       ├── results.csv
+│       └── weights/
+│           ├── best.pt
+│           ├── last.pt
+│           └── best.onnx
+├── tests/                   # API与集成测试
+├── frontend/                # 前端页面
+├── requirements.txt         # 依赖
+└── README.md
 ```
 
-## 开发步骤
+## 训练与实验结果
 
-1. ✅ 搭建项目基础结构
-2. ✅ YOLOv7模型集成与训练
-3. ✅ FastAPI后端API开发
-4. ✅ 模型加载器和检测API重构
-5. ⏳ 网页端测试界面优化
-6. ⏳ 系统功能完善和性能优化
-7. ⏳ 云服务器部署
+- 训练命令示例：
+   ```bash
+   python models/train_yolov11_mask_detection.py --device 0 --batch-size 16 --epochs 200
+   ```
+- 训练耗时：约4.3小时（RTX 3050 4GB）
+- 最佳模型：`runs/yolov11_mask_detection/custom_v2_accum/weights/best.pt`（5.5MB）
+- ONNX模型：`best.onnx`（10.1MB，满足≤80MB约束）
+- 训练曲线：`training_curves.png`，自动生成
+- 验证集表现：
+   - mAP@0.5：0.84
+   - mAP@0.5:0.95：0.54
+   - Precision：0.83
+   - Recall：0.79
+   - R_mask类别：P=0.97，R=0.96，mAP@0.5=0.99
+   - W_mask类别：P=0.68，R=0.62，mAP@0.5=0.69
 
 ## 快速开始
 
 ### 1. 环境准备
 
 ```bash
-# 克隆项目
 git clone <repository-url>
-cd mask-detection-system
-
-# 安装依赖
+cd graduation_project
 pip install -r requirements.txt
-
-# 安装YOLOv7依赖
-cd yolov7
-pip install -r requirements.txt
-cd ..
 ```
 
-### 2. 模型训练
+### 2. 数据准备
 
 ```bash
-# 准备数据集
 python data/prepare_dataset.py
-
-# 训练YOLOv7口罩检测模型
-python models/train_mask_detection.py --data data/mask_detection.yaml --cfg yolov7/cfg/training/yolov7.yaml --weights yolov7/weights/yolov7.pt --epochs 100
+# 或根据 data/mask_detection.yaml 配置数据集路径
 ```
 
-### 3. 启动服务
+### 3. 模型训练
 
 ```bash
-# 启动FastAPI后端服务（开发模式）
-uvicorn backend.app:app --host 0.0.0.0 --port 5000 --reload
-
-# 或在生产模式下使用
-python backend/app.py
-
-# 访问前端界面
-# 打开浏览器访问 http://localhost:5000
+python models/train_yolov11_mask_detection.py --device 0 --batch-size 16 --epochs 200
 ```
 
-### 4. API使用
+### 4. 启动后端服务
+
+```bash
+# FastAPI开发模式
+uvicorn backend.app:app --host 0.0.0.0 --port 5000 --reload
+# ONNX推理服务
+python backend/app_onnx_fastapi.py
+```
+
+### 5. API调用示例
 
 ```python
-import requests
-import base64
-
-# 图像检测API
-with open('test_image.jpg', 'rb') as f:
-    image_data = base64.b64encode(f.read()).decode()
-
-response = requests.post('http://localhost:5000/api/detect', 
-                        json={'image': image_data})
-result = response.json()
+import requests, base64
+with open('test.jpg', 'rb') as f:
+      img = base64.b64encode(f.read()).decode()
+r = requests.post('http://localhost:5000/api/detect_base64', json={'image': img})
+print(r.json())
 ```
-
-## 环境要求
-
-- Python 3.8+
-- PyTorch 1.10+
-- CUDA 11.0+ (GPU推理)
-- OpenCV 4.5+
-- FastAPI 0.110+
-- NumPy 1.21+
-
-## 性能指标
-
-- **检测精度**: mAP@0.5 > 95%
-- **推理速度**: >30 FPS (RTX 3080)
-- **模型大小**: ~75MB (YOLOv7)
-- **内存占用**: <2GB (推理时)
 
 ## 部署说明
 
-### Docker部署
+- Docker部署：
+   ```bash
+   docker build -t mask-detection -f deployment/docker/Dockerfile .
+   docker run -p 5000:5000 --gpus all mask-detection
+   ```
+- 微信小程序/前端：通过WebSocket或Base64 API实时推理
 
-```bash
-# 构建镜像
-docker build -t mask-detection .
+## 主要变更与亮点
 
-# 运行容器
-docker run -p 5000:5000 --gpus all mask-detection
-```
+- 新增YOLOv11n训练主脚本，支持自动batch size与混合精度
+- 训练结果自动保存曲线图与CSV，便于论文复现
+- ONNX模型导出与推理服务，适配小程序端
+- 完善API测试用例，保证接口稳定
+- 训练与推理均适配4GB显存，模型体积远小于80MB
 
-### 云服务器部署
+## 运行结果样例
 
-```bash
-# 使用部署脚本
-chmod +x deployment/scripts/deploy.ps1
-./deployment/scripts/deploy.ps1
-```
-
-## 技术特点
-
-1. **YOLOv7架构优势**
-   - 更高的检测精度和速度
-   - 更好的小目标检测能力
-   - 优化的网络结构和训练策略
-
-2. **系统架构设计**
-   - 模块化设计，易于扩展
-   - 异步处理，支持高并发
-   - 内存优化，支持长时间运行
-
-3. **实时性能**
-   - GPU加速推理
-   - 批量处理优化
-   - 智能缓存机制
+- 训练曲线与详细指标见 `runs/yolov11_mask_detection/custom_v2_accum/`
+- ONNX模型可直接用于微信小程序或Web端部署
 
 ## 许可证
 
 MIT License
 
-## 贡献指南
+---
 
-欢迎提交Issue和Pull Request来改进项目。
-
-## 联系方式
-
-如有问题，请通过Issue或邮件联系。
+如需更详细的实验分析或曲线图展示，可进一步联系作者。
