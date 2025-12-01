@@ -175,11 +175,10 @@ class YOLOv11MaskDetectionTrainer:
         # 训练配置
         train_args = {
             'data': self.data_path,
-            'epochs': 200,  # Dr. Chen: 延长训练轮数到 200
+            'epochs': 200,  
             'imgsz': self.img_size,
-            'batch': 16,    # Dr. Chen: 显存受限，物理 Batch 设为 16 (或 32，视显存而定)
-            
-            # --- 陈金鹏老师的建议 (梯度累积) ---
+            'batch': 16,    #显存受限，物理 Batch 设为 16 (或 32，视显存而定)
+        
             # nbs (Nominal Batch Size) 设为 64。
             # 逻辑：如果物理 batch=16，框架会自动累计 64/16 = 4 次梯度再更新。
             # 效果：等效于 64 batch size 的稳定性，解决 Precision 震荡。
@@ -191,7 +190,7 @@ class YOLOv11MaskDetectionTrainer:
             'name': 'custom_v2_accum', # 改个名字方便区分
             'exist_ok': True,
             
-            # --- Hawkeye 的增强策略 (提升 Recall) ---
+            # 提升 Recall
             'optimizer': 'auto',
             'workers': self.workers,
             'amp': True,    # 必须开启混合精度以节省显存
@@ -334,19 +333,45 @@ class YOLOv11MaskDetectionTrainer:
             return
 
         import math
+        import numpy as np
 
-        rows = math.ceil(len(plotted) / 2)
+        pr_df = None
+        if {'metrics/precision(B)', 'metrics/recall(B)'}.issubset(df.columns):
+            candidate = df[['metrics/recall(B)', 'metrics/precision(B)']].dropna()
+            if not candidate.empty:
+                pr_df = candidate.sort_values('metrics/recall(B)')
+
+        total_plots = len(plotted) + (1 if pr_df is not None else 0)
+        rows = math.ceil(total_plots / 2)
         fig, axes = plt.subplots(rows, 2, figsize=(12, 4 * rows))
         axes = axes.flatten()
 
-        for idx, (title, column) in enumerate(plotted):
-            axes[idx].plot(df['epoch'], df[column], label=title, color='#1f77b4')
-            axes[idx].set_title(title)
-            axes[idx].set_xlabel('Epoch')
-            axes[idx].set_ylabel(column)
-            axes[idx].grid(True, linestyle='--', alpha=0.4)
+        next_axis = 0
+        for title, column in plotted:
+            ax = axes[next_axis]
+            ax.plot(df['epoch'], df[column], label=title, color='#1f77b4')
+            ax.set_title(title)
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel(column)
+            ax.grid(True, linestyle='--', alpha=0.4)
+            next_axis += 1
 
-        for idx in range(len(plotted), len(axes)):
+        if pr_df is not None:
+            recall = pr_df['metrics/recall(B)'].to_numpy()
+            precision = pr_df['metrics/precision(B)'].to_numpy()
+            auc_value = np.trapz(precision, recall)
+            ax = axes[next_axis]
+            ax.plot(recall, precision, color='#d62728', label='PR Curve')
+            ax.set_title(f'Precision-Recall (AUC={auc_value:.3f})')
+            ax.set_xlabel('Recall')
+            ax.set_ylabel('Precision')
+            ax.set_xlim(0, 1)
+            ax.set_ylim(0, 1)
+            ax.grid(True, linestyle='--', alpha=0.4)
+            ax.legend(loc='lower left')
+            next_axis += 1
+
+        for idx in range(next_axis, len(axes)):
             axes[idx].axis('off')
 
         fig.tight_layout()
