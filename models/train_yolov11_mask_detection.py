@@ -356,19 +356,21 @@ class YOLOv11MaskDetectionTrainer:
             ax.grid(True, linestyle='--', alpha=0.4)
             next_axis += 1
 
-        if pr_df is not None:
-            recall = pr_df['metrics/recall(B)'].to_numpy()
-            precision = pr_df['metrics/precision(B)'].to_numpy()
-            auc_value = np.trapz(precision, recall)
+        if {'metrics/precision(B)', 'metrics/recall(B)'}.issubset(df.columns):
+            # 计算 F1 Score
+            # F1 = 2 * (P * R) / (P + R)
+            p = df['metrics/precision(B)']
+            r = df['metrics/recall(B)']
+            f1 = 2 * (p * r) / (p + r + 1e-16)
+            
             ax = axes[next_axis]
-            ax.plot(recall, precision, color='#d62728', label='PR Curve')
-            ax.set_title(f'Precision-Recall (AUC={auc_value:.3f})')
-            ax.set_xlabel('Recall')
-            ax.set_ylabel('Precision')
-            ax.set_xlim(0, 1)
+            ax.plot(df['epoch'], f1, color='#2ca02c', label='F1 Score')
+            ax.set_title(f'F1 Score Curve (Max={f1.max():.3f})')
+            ax.set_xlabel('Epoch')
+            ax.set_ylabel('F1 Score')
             ax.set_ylim(0, 1)
             ax.grid(True, linestyle='--', alpha=0.4)
-            ax.legend(loc='lower left')
+            ax.legend(loc='lower right')
             next_axis += 1
 
         for idx in range(next_axis, len(axes)):
