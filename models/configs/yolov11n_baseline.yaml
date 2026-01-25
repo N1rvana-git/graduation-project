@@ -4,8 +4,8 @@
 
 # Model
 model_size: yolo11n
-nc: 2  # 类别数（no_mask, mask）
-names: [no_mask, mask]
+nc: 3  # 类别数（R_mask, W_mask, N_mask）
+names: [R_mask, W_mask, N_mask]
 
 # Training hyperparameters
 lr0: 0.01  # 初始学习率
