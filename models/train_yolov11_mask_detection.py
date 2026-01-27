@@ -21,6 +21,10 @@ from pathlib import Path
 try:
     from ultralytics import YOLO
     from ultralytics import settings
+    # 动态注册自定义模块，确保YAML解析器能找到 GAMAttention
+    from models.modules.attention import GAMAttention
+    import ultralytics.nn.modules.block
+    setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
 except ImportError:
     print("错误：未安装ultralytics库")
     print("请运行：pip install ultralytics")
