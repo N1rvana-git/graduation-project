@@ -21,7 +21,15 @@ backbone:
   - [-1, 2, C3k2, [1024, True]]
   - [-1, 1, SPPF, [1024, 5]]
   - [-1, 2, C2PSA, [1024]]
-  - [-1, 1, GAMAttention, [1024, 4]]
+  # GAMAttention 参数: [c1, c2, rate]
+  # 注意: 自定义模块在 YAML 解析时不会自动缩放通道数 (对于 unknown module)，
+  # 且不像 Conv 那样自动传入 c1。
+  # 因此对于 yolov11n (width=0.25)，需手动指定缩放后的通道数: 1024 * 0.25 = 256.
+  # args 对应 __init__(c1, c2, group, rate)。这里传入 [256, 256, 4]。
+  # 其中 group=4 (占位,未被使用), rate=4 (默认) -> 实际上 rate 参数我们要手动传可能需要调整参数顺序
+  # 但为了简单，我们假设 __init__ 第3个参数 group 也是 rate 也没关系，或者我们在代码里改一下 init
+  # 最好是: [256, 256, 4] -> c1=256, c2=256, group=4. rate用默认4.
+  - [-1, 1, GAMAttention, [256, 256]] 
 
 head:
   - [-1, 1, nn.Upsample, [None, 2, "nearest"]]
