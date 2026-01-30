@@ -72,10 +72,11 @@ class YOLOv11MaskDetectionTrainer:
         if workers is not None:
             self.workers = workers
         elif os.name == 'nt':
-            # Windows由于多进程机制差异，过多的workers会导致Page File too small错误
-            # 限制默认为2，既保证速度又避免崩溃
-            self.workers = min(int((os.cpu_count() or 1)), 2)
-            print(f"⚠️ Windows系统自动调整 DataLoader workers={self.workers} 以避免虚拟内存不足(WinError 1455)")
+            # === Prof. Edge 修复 ===
+            # Windows 显存/内存紧缺时的终极保底方案：使用单线程 (0)
+            # 原始设置是 2，但你的环境依然报错，说明资源非常紧张，必须降为 0
+            self.workers = 0 
+            print(f"⚠️ Windows系统检测到内存压力，强制 DataLoader workers={self.workers} (单线程模式)")
         else:
             self.workers = max(0, min((os.cpu_count() or 1) - 1, 8))
 
@@ -210,45 +211,48 @@ class YOLOv11MaskDetectionTrainer:
             'data': self.data_path,
             'epochs': self.epochs,  
             'imgsz': self.img_size,
-            'batch': 16,    #显存受限，物理 Batch 设为 16 (或 32，视显存而定)
-        
+            'batch': 16,    # 显存受限，物理 Batch 设为 16 (或 32，视显存而定)
+
             # nbs (Nominal Batch Size) 设为 64。
-            # 逻辑：如果物理 batch=16，框架会自动累计 64/16 = 4 次梯度再更新。
-            # 效果：等效于 64 batch size 的稳定性，解决 Precision 震荡。
             'nbs': 64,      
-            # -------------------------------
 
             'device': self.device,
             'project': self.project,
-            'name': 'final_gam_wiou_transfer', # 最终修正版(迁移学习)
+            'name': 'final_gam_wiou_p2', # 新版P2结构
             'exist_ok': True,
-            
-            # 提升 Recall
+
+            # 训练耐心：扩增数据后避免过早停止
+            'patience': 300,
+
+            # Recall提升关键参数
             'optimizer': 'auto',
             'workers': self.workers,
             'amp': True,    # 必须开启混合精度以节省显存
-            
-            # 针对遮挡和密集人群的增强
+
+            # 冻结Backbone前10轮，保护预训练特征
+            'freeze': 10,
+
+            # 针对小目标/人脸的增强
             'mosaic': 1.0,
-            'mixup': 0.2,       # 从 0.1 提升到 0.2
-            'copy_paste': 0.15,  # 从 0.1 提升到 0.3 -> 调整为 0.15 配合迁移学习
-            
+            'mixup': 0.25,       # 增强混合
+            'copy_paste': 0.3,   # 大幅提升Copy-Paste
+
             # 几何增强
-            'degrees': 15.0,    # 增加旋转角度
+            'degrees': 20.0,    # 增加旋转角度
             'translate': 0.1,
             'scale': 0.5,
-            'shear': 2.0,
+            'shear': 2.5,       # 增加剪切
             'perspective': 0.0005,
             'flipud': 0.0,
             'fliplr': 0.5,
-            
+
             # 光照增强
             'hsv_h': 0.015,
             'hsv_s': 0.7,
             'hsv_v': 0.4,
             
             # 训练策略
-            'close_mosaic': 15, # 最后 15 轮关闭 Mosaic，精细微调
+            'close_mosaic': 30, # 最后 30 轮关闭 Mosaic，强化真实分布
             'save': True,
             'save_period': 10,
             'plots': True,
