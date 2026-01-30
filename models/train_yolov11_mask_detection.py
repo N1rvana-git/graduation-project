@@ -24,11 +24,12 @@ try:
     # 动态注册自定义模块，确保YAML解析器能找到 GAMAttention
     from models.modules.attention import GAMAttention
     import ultralytics.nn.modules.block
-    import ultralytics.nn.tasks
-    
-    # 猴子补丁：将 GAMAttention 注入到 ultralytics 的模块查找路径中
     setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
-    setattr(ultralytics.nn.tasks, 'GAMAttention', GAMAttention)
+    # 保留WIoU模块引用（论文一致性）
+    try:
+        from models.losses.wiou import WIoULoss
+    except ImportError:
+        WIoULoss = None
 except ImportError:
     print("错误：未安装ultralytics库")
     print("请运行：pip install ultralytics")
@@ -67,19 +68,7 @@ class YOLOv11MaskDetectionTrainer:
         self.epochs = epochs
         self.device = device
         self.project = project
-        
-        # 自动配置 workers
-        if workers is not None:
-            self.workers = workers
-        elif os.name == 'nt':
-            # === Prof. Edge 修复 ===
-            # Windows 显存/内存紧缺时的终极保底方案：使用单线程 (0)
-            # 原始设置是 2，但你的环境依然报错，说明资源非常紧张，必须降为 0
-            self.workers = 0 
-            print(f"⚠️ Windows系统检测到内存压力，强制 DataLoader workers={self.workers} (单线程模式)")
-        else:
-            self.workers = max(0, min((os.cpu_count() or 1) - 1, 8))
-
+        self.workers = workers if workers is not None else max(0, min((os.cpu_count() or 1) - 1, 8))
         self.export_onnx_flag = export_onnx
         
         # 设置路径
@@ -185,75 +174,69 @@ class YOLOv11MaskDetectionTrainer:
         # 判断是否使用自定义结构
         use_custom = self.model_size in ["yolo11n_mask_custom", "custom"]
         if use_custom:
-            custom_cfg_path = str(self.project_root / "models" / "configs" / "yolo11n_mask_custom.yaml")
-            print(f"\n📥 加载自定义结构: {custom_cfg_path}")
-            print("   👉 结构包含: GAMAttention + WIoU + P2Detect")
-            
-            # 1. 先构建自定义的网络结构 (随机初始化)
-            model = YOLO(custom_cfg_path)
-            
-            # 2. 关键步骤：尝试加载 yolo11n.pt 的预训练权重
-            # 这叫 "Partial Transfer Learning" (部分迁移学习)
+            print("\n📥 加载自定义YOLOv11n结构（含GAM/WIoU/P2）...")
+            custom_cfg = str(self.project_root / "models" / "configs" / "yolo11n_mask_custom.yaml")
+            print(f"🏗️ 构建模型结构: {custom_cfg}")
+            model = YOLO(custom_cfg)
+            # 迁移加载预训练权重
             try:
-                print("⚖️  正在尝试迁移加载 COCO 预训练权重 (yolo11n.pt)...")
-                # load() 会自动匹配名字和形状相同的层，跳过不匹配的层(如GAM部分)
-                model.load("yolo11n.pt") 
-                print("✅ 预训练权重加载成功！(不匹配的层将保持随机初始化)")
+                print("📥 加载预训练权重: yolo11n.pt")
+                model.load("yolo11n.pt")
+                print("✅ 预训练权重加载成功（不匹配层将保持随机初始化）")
             except Exception as e:
-                print(f"⚠️ 警告: 权重迁移加载遇到问题: {e}")
-                print("   (如果是形状不匹配引起的报错，通常会自动跳过，不影响训练)")
+                print(f"⚠️ 权重加载警告（可忽略）: {e}")
         else:
-            print("\n📥 加载官方基准模型: yolo11n.pt")
-            model = YOLO('yolo11n.pt')
+            print(f"\n📥 加载YOLOv11n模型...")
+            model = YOLO(f'{self.model_size}.pt')
 
         # 训练配置
         train_args = {
             'data': self.data_path,
-            'epochs': self.epochs,  
+            'epochs': self.epochs,
             'imgsz': self.img_size,
-            'batch': 16,    # 显存受限，物理 Batch 设为 16 (或 32，视显存而定)
-
+            'batch': 16,    #显存受限，物理 Batch 设为 16 (或 32，视显存而定)
+        
             # nbs (Nominal Batch Size) 设为 64。
+            # 逻辑：如果物理 batch=16，框架会自动累计 64/16 = 4 次梯度再更新。
+            # 效果：等效于 64 batch size 的稳定性，解决 Precision 震荡。
             'nbs': 64,      
+            # -------------------------------
 
             'device': self.device,
             'project': self.project,
-            'name': 'final_gam_wiou_p2', # 新版P2结构
+            'name': 'custom_v2_accum', # 改个名字方便区分
             'exist_ok': True,
-
-            # 训练耐心：扩增数据后避免过早停止
-            'patience': 300,
-
-            # Recall提升关键参数
+            
+            # 提升 Recall
             'optimizer': 'auto',
+            'cos_lr': True,
+            'warmup_epochs': 3.0,
             'workers': self.workers,
             'amp': True,    # 必须开启混合精度以节省显存
-            'cos_lr': True,
-
-            # 冻结Backbone前10轮，保护预训练特征
-            'freeze': 10,
-
-            # 针对小目标/人脸的增强
+            
+            # 针对遮挡和密集人群的增强
             'mosaic': 1.0,
-            'mixup': 0.25,       # 增强混合
-            'copy_paste': 0.3,   # 大幅提升Copy-Paste
-
+            'mixup': 0.2,       # 从 0.1 提升到 0.2
+            'copy_paste': 0.3,  # 从 0.1 提升到 0.3 (关键！)
+            
             # 几何增强
-            'degrees': 20.0,    # 增加旋转角度
+            'degrees': 15.0,    # 增加旋转角度
             'translate': 0.1,
             'scale': 0.5,
-            'shear': 2.5,       # 增加剪切
+            'shear': 2.0,
             'perspective': 0.0005,
             'flipud': 0.0,
             'fliplr': 0.5,
-
+            
             # 光照增强
             'hsv_h': 0.015,
             'hsv_s': 0.7,
             'hsv_v': 0.4,
             
             # 训练策略
-            'close_mosaic': 30, # 最后 30 轮关闭 Mosaic，强化真实分布
+            'close_mosaic': 20, # 最后 20 轮关闭 Mosaic，精细微调
+            'seed': 42,
+            'deterministic': True,
             'save': True,
             'save_period': 10,
             'plots': True,
