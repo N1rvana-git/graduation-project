@@ -228,6 +228,7 @@ class YOLOv11MaskDetectionTrainer:
             'optimizer': 'auto',
             'workers': self.workers,
             'amp': True,    # 必须开启混合精度以节省显存
+            'cos_lr': True,
 
             # 冻结Backbone前10轮，保护预训练特征
             'freeze': 10,
