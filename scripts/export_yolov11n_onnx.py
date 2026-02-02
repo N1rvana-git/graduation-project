@@ -1,88 +1,53 @@
-"""Utility script to export YOLOv11 weights to ONNX.
+import sys
+import os
+import warnings
 
-Uses ultralytics.YOLO to convert the provided .pt weights into an ONNX model
-that can be consumed by the backend service.
-"""
+# 1. 抑制无关警告
+warnings.filterwarnings("ignore")
 
-from __future__ import annotations
-
-import argparse
-import shutil
-from pathlib import Path
+# 2. 确保能找到项目根目录 (根据脚本位置调整)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+project_root = os.path.abspath(os.path.join(current_dir, '..'))
+sys.path.append(project_root)
 
 try:
     from ultralytics import YOLO
-    import sys
-    import os
     import ultralytics.nn.modules.block
     import ultralytics.nn.tasks
+    
+    # === [关键] 注册自定义模块 ===
+    # 如果不加这几行，加载权重时会报错 "Can't get attribute 'GAMAttention'..."
+    from models.modules.attention import GAMAttention
+    setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
+    setattr(ultralytics.nn.tasks, 'GAMAttention', GAMAttention)
+    print("✅ [System] Custom module 'GAMAttention' registered successfully.")
+    
+except ImportError as e:
+    print(f"❌ [Error] Failed to register custom modules: {e}")
+    sys.exit(1)
 
-    # Add project root to path to import modules
-    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+def export_model():
+    # 指向你训练好的最佳权重路径
+    model_path = os.path.join(project_root, 'runs/yolov11_mask_detection/custom_v2_accum/weights/best.pt')
+    
+    if not os.path.exists(model_path):
+        print(f"⚠️Model not found at {model_path}, please check the path.")
+        return
 
-    # Import and register GAMAttention
-    try:
-        from models.modules.attention import GAMAttention
-        # Monkey patch: Register custom module
-        setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
-        setattr(ultralytics.nn.tasks, 'GAMAttention', GAMAttention)
-        print("✅ GAMAttention registered successfully for export.")
-    except ImportError as e:
-        print(f"⚠️ Warning: Could not import GAMAttention. Export might fail if model uses it. Error: {e}")
-
-except ImportError as exc:  # pragma: no cover
-    raise SystemExit(
-        "Ultralytics is required. Install it via `pip install ultralytics`."
-    ) from exc
-
-
-def export_to_onnx(weights: Path, img_size: int, output: Path | None, dynamic: bool) -> Path:
-    """Export the given weights to ONNX and return the final path."""
-    if not weights.exists():
-        raise FileNotFoundError(f"Weights file not found: {weights}")
-
-    model = YOLO(str(weights))
-    print(f"Loaded weights: {weights}")
-
-    onnx_temp = Path(
-        model.export(format="onnx", imgsz=img_size, dynamic=dynamic, simplify=True)
+    print(f"🚀 Loading model from {model_path}...")
+    model = YOLO(model_path)
+    
+    # 导出为 ONNX (针对微信小程序优化)
+    # opset=12 是移动端兼容性最好的版本
+    print("📦 Starting ONNX export...")
+    success = model.export(
+        format='onnx',
+        imgsz=640,
+        opset=12,      
+        simplify=True, # 简化图结构
+        dynamic=False  # 微信小程序通常需要静态输入
     )
-    print(f"Temporary ONNX path: {onnx_temp}")
-
-    if output is None:
-        output = Path("models/weights") / f"{weights.stem}.onnx"
-
-    output.parent.mkdir(parents=True, exist_ok=True)
-    shutil.move(str(onnx_temp), output)
-    print(f"Saved ONNX model to: {output.resolve()}")
-
-    size_mb = output.stat().st_size / (1024 * 1024)
-    print(f"Model size: {size_mb:.2f} MB")
-    if size_mb > 80:
-        print("Warning: model size exceeds 80 MB target.")
-
-    return output
-
-
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export YOLOv11 to ONNX")
-    parser.add_argument("--weights", default="yolo11n.pt", help="Path to .pt weights")
-    parser.add_argument("--img-size", type=int, default=640, help="Inference image size")
-    parser.add_argument("--output", help="Optional output path for the .onnx file")
-    parser.add_argument(
-        "--dynamic",
-        action="store_true",
-        help="Use dynamic axes for height/width/batch",
-    )
-    return parser.parse_args()
-
-
-def main() -> None:
-    args = parse_args()
-    weights = Path(args.weights)
-    output = Path(args.output) if args.output else None
-    export_to_onnx(weights, args.img_size, output, args.dynamic)
-
+    print(f"🎉 Export Success: {success}")
 
 if __name__ == "__main__":
-    main()
+    export_model()
