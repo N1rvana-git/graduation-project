@@ -1,9 +1,13 @@
-path: ./data/combined_dataset
+# data/mask_detection_combined.yaml
+
+# ⚠️ 关键修改：使用相对路径，确保在任何电脑/Docker上都能跑
+path: ./data/combined_dataset  
 train: images/train
 val: images/val
 test: images/val
-nc: 3
+
+# 类别名称 (必须与你的标注一致)
 names:
-- R_mask
-- W_mask
-- N_mask
+  0: R_mask
+  1: W_mask
+  2: N_mask
