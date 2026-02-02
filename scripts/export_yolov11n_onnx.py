@@ -12,6 +12,24 @@ from pathlib import Path
 
 try:
     from ultralytics import YOLO
+    import sys
+    import os
+    import ultralytics.nn.modules.block
+    import ultralytics.nn.tasks
+
+    # Add project root to path to import modules
+    sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+    # Import and register GAMAttention
+    try:
+        from models.modules.attention import GAMAttention
+        # Monkey patch: Register custom module
+        setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
+        setattr(ultralytics.nn.tasks, 'GAMAttention', GAMAttention)
+        print("✅ GAMAttention registered successfully for export.")
+    except ImportError as e:
+        print(f"⚠️ Warning: Could not import GAMAttention. Export might fail if model uses it. Error: {e}")
+
 except ImportError as exc:  # pragma: no cover
     raise SystemExit(
         "Ultralytics is required. Install it via `pip install ultralytics`."

@@ -1,4 +1,4 @@
-path: e:/graduation_project/Mask-Wearing-Detection/data/combined_dataset
+path: ./data/combined_dataset
 train: images/train
 val: images/val
 test: images/val

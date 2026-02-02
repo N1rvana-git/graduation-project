@@ -43,7 +43,7 @@ class YOLOv11MaskDetectionTrainer:
                  data_path="data/mask_detection.yaml",
                  model_size="yolo11n",
                  img_size=640,
-                 batch_size=16,
+                 batch_size=32,
                  epochs=100,
                  device="0",
                  project="runs/yolov11_mask_detection",
@@ -201,6 +201,13 @@ class YOLOv11MaskDetectionTrainer:
             # 效果：等效于 64 batch size 的稳定性，解决 Precision 震荡。
             'nbs': 64,      
             # -------------------------------
+
+            # === [WIoU 策略对齐] ===
+            # 提高 Box Loss 权重 (默认7.5 -> 8.0)，强调边框回归精度
+            'box': 8.0, 
+            # 提高 DFL (Distribution Focal Loss) 权重 (默认1.5 -> 2.0)
+            # DFL 对于解决口罩遮挡导致的不确定性边界非常有帮助
+            'dfl': 2.0, 
 
             'device': self.device,
             'project': self.project,
