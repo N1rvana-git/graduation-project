@@ -197,7 +197,7 @@ class YOLOv11MaskDetectionTrainer:
         train_args = {
             'data': self.data_path,
             'epochs': self.epochs,
-            'patience': 15, # 显式设置早停轮数为15（无提升15轮后停止）
+            'patience': 0,  # 禁用早停，确保跑满200轮
             'imgsz': self.img_size,
             'batch': 8,    # 显存受限(4GB)，物理 Batch 设为 8 以支持P2层
         
