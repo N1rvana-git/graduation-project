@@ -24,7 +24,11 @@ try:
     # 动态注册自定义模块，确保YAML解析器能找到 GAMAttention
     from models.modules.attention import GAMAttention
     import ultralytics.nn.modules.block
+    import ultralytics.nn.tasks
+    # 同时在 block 和 tasks 模块中注册，防止 KeyError
     setattr(ultralytics.nn.modules.block, 'GAMAttention', GAMAttention)
+    setattr(ultralytics.nn.tasks, 'GAMAttention', GAMAttention)
+    
     # 保留WIoU模块引用（论文一致性）
     try:
         from models.losses.wiou import WIoULoss
@@ -96,10 +100,10 @@ class YOLOv11MaskDetectionTrainer:
         
         # RTX 3050 Laptop GPU = 4GB显存
         # 根据开题报告的硬件约束优化
-        if gpu_memory <= 4:
-            # YOLOv11n在4GB显存下的推荐配置
-            batch_size = 32
-            print(f"✅ 自动配置批次大小: {batch_size} (适配4GB显存)")
+        if gpu_memory <= 5:
+            # YOLOv11n在4GB显存下的推荐配置 (P2层需要更多显存，降至8)
+            batch_size = 8
+            print(f"✅ 自动配置批次大小: {batch_size} (适配4GB显存+P2层)")
         elif gpu_memory <= 8:
             batch_size = 64
             print(f"✅ 自动配置批次大小: {batch_size} (适配8GB显存)")
@@ -193,11 +197,12 @@ class YOLOv11MaskDetectionTrainer:
         train_args = {
             'data': self.data_path,
             'epochs': self.epochs,
+            'patience': 15, # 显式设置早停轮数为15（无提升15轮后停止）
             'imgsz': self.img_size,
-            'batch': 16,    #显存受限，物理 Batch 设为 16 (或 32，视显存而定)
+            'batch': 8,    # 显存受限(4GB)，物理 Batch 设为 8 以支持P2层
         
             # nbs (Nominal Batch Size) 设为 64。
-            # 逻辑：如果物理 batch=16，框架会自动累计 64/16 = 4 次梯度再更新。
+            # 逻辑：如果物理 batch=8，框架会自动累计 64/8 = 8 次梯度再更新。
             # 效果：等效于 64 batch size 的稳定性，解决 Precision 震荡。
             'nbs': 64,      
             # -------------------------------
@@ -215,10 +220,10 @@ class YOLOv11MaskDetectionTrainer:
             'exist_ok': True,
             
             # 提升 Recall
-            'optimizer': 'auto',
+            'optimizer': 'SGD',
             'cos_lr': True,
             'warmup_epochs': 3.0,
-            'workers': self.workers,
+            'workers': 4,   # 减少DataLoader线程数以节省系统内存
             'amp': True,    # 必须开启混合精度以节省显存
             
             # 针对遮挡和密集人群的增强
@@ -432,7 +437,7 @@ class YOLOv11MaskDetectionTrainer:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description='YOLOv11口罩检测训练')
-    parser.add_argument('--data', type=str, default='data/mask_detection.yaml', 
+    parser.add_argument('--data', type=str, default='data/mask_detection_combined.yaml', 
                        help='数据集配置文件')
     parser.add_argument('--model', type=str, default='yolo11n', 
                        help='模型大小 (yolo11n, yolo11s, yolo11m等)')
@@ -440,7 +445,7 @@ def main():
                        help='输入图像尺寸')
     parser.add_argument('--batch-size', type=int, default=-1, 
                        help='批次大小（-1表示自动优化）')
-    parser.add_argument('--epochs', type=int, default=100, 
+    parser.add_argument('--epochs', type=int, default=200, 
                        help='训练轮数')
     parser.add_argument('--device', type=str, default='0', 
                        help='设备 (cpu, 0, 1等)')

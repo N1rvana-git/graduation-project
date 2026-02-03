@@ -6,8 +6,9 @@ train: images/train
 val: images/val
 test: images/val
 
+nc: 3
 # 类别名称 (必须与你的标注一致)
 names:
-  0: R_mask
-  1: W_mask
-  2: N_mask
+  - R_mask
+  - W_mask
+  - N_mask
